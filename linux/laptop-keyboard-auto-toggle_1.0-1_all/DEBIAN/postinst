@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+chmod 0755 /usr/bin/laptop-keyboard-auto-toggle 2>/dev/null || true
+chmod 0755 /usr/bin/laptop-keyboard-toggle-helper 2>/dev/null || true
+chmod 0440 /etc/sudoers.d/laptop-keyboard-toggle 2>/dev/null || true
+
+exit 0

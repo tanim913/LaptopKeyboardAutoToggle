@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Laptop Keyboard Auto-Toggle
+Comment=Automatically disables internal keyboard when wireless USB dongle is connected
+Exec=/usr/bin/laptop-keyboard-auto-toggle
+Icon=input-keyboard
+Terminal=false
+Categories=Utility;HardwareSettings;
+X-GNOME-Autostart-enabled=true
