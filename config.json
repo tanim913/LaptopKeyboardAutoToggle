@@ -1,0 +1,8 @@
+{
+  "InternalKeyboardHardwareId": "ACPI\\HPQ8002",
+  "UsbDongleHardwareId": "VID_1EA7&PID_0066",
+  "EmergencyHotkey": "Ctrl+Alt+Shift+F12",
+  "DisableParentIfChildFails": true,
+  "LogFileName": "app.log"
+}
+
