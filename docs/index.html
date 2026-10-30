@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LaptopKeyboardAutoToggle — Automatic Internal Keyboard Suppression</title>
+  <meta name="description" content="Lightweight open-source utility for Windows and Ubuntu that automatically silences faulty laptop keyboards when a wireless USB dongle connects.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="site-nav">
+    <div class="nav-container">
+      <a href="#" class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M6 12h.001M10 12h.001M14 12h.001M18 12h.001M7 16h10"></path>
+        </svg>
+        <span>LaptopKeyboardAutoToggle</span>
+      </a>
+
+      <div class="nav-links">
+        <a href="#simulator">Interactive Demo</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle" class="nav-btn-gh" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero-section">
+    <div class="hero-container">
+      <div class="version-badge">
+        <span class="badge-dot"></span>
+        <span>Version 1.0.0 Released for Windows & Ubuntu</span>
+      </div>
+
+      <h1 class="hero-title">
+        Silence your faulty laptop keyboard the moment your wireless dongle connects.
+      </h1>
+
+      <p class="hero-description">
+        Windows and Linux block ordinary tools from disabling built-in keyboards. LaptopKeyboardAutoToggle uses kernel-level suppression and serio bus unbinding to automatically turn off malfunctioning laptop keyboards with zero latency, zero polling, and guaranteed recovery.
+      </p>
+
+      <div class="hero-actions">
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle/releases/download/v1.0.0/LaptopKeyboardAutoToggle-win-x64.zip" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+          </svg>
+          <span>Download for Windows (.zip)</span>
+        </a>
+
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle/releases/download/v1.0.0/laptop-keyboard-auto-toggle_1.0-1_all.deb" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 6.627 5.373 12 12 12s12-5.373 12-12c0-6.627-5.373-12-12-12zm-3.414 4.586a2.001 2.001 0 110 4 2.001 2.001 0 010-4zm6.828 0a2 2 0 110 4 2 2 0 010-4zM12 14.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"/>
+          </svg>
+          <span>Download for Ubuntu (.deb)</span>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <span>No setup wizard</span>
+        <span class="meta-separator">•</span>
+        <span>No background polling</span>
+        <span class="meta-separator">•</span>
+        <span>100% Free & Open Source</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Interactive Demo / Simulator Section -->
+  <section id="simulator" class="simulator-section">
+    <div class="section-container">
+      <div class="section-header">
+        <h2 class="section-title">See it in action: Live Hardware Simulator</h2>
+        <p class="section-subtitle">Toggle the USB dongle below to test how the automation detects peripheral events and silences hardware.</p>
+      </div>
+
+      <div class="simulator-card">
+        <div class="simulator-controls">
+          <div class="control-label">
+            <span class="control-indicator" id="simDongleStatusDot"></span>
+            <span id="simDongleStatusText">USB Dongle: Plugged In</span>
+          </div>
+
+          <button id="simToggleBtn" class="sim-btn">
+            <svg class="plug-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"></path>
+            </svg>
+            <span id="simBtnLabel">Unplug USB Dongle</span>
+          </button>
+        </div>
+
+        <div class="simulator-grid">
+          <!-- Laptop Keyboard Device Card -->
+          <div class="device-box" id="simLaptopBox">
+            <div class="device-header">
+              <div class="device-identity">
+                <span class="device-type">Internal Hardware</span>
+                <span class="device-name">Standard PS/2 Laptop Keyboard</span>
+              </div>
+              <span class="status-pill status-disabled" id="simLaptopPill">MUTED</span>
+            </div>
+
+            <div class="device-body">
+              <div class="device-visual">
+                <div class="keyboard-frame" id="simLaptopFrame">
+                  <div class="key-row"><span class="key"></span><span class="key"></span><span class="key"></span><span class="key"></span><span class="key"></span></div>
+                  <div class="key-row"><span class="key"></span><span class="key"></span><span class="key"></span><span class="key"></span><span class="key"></span></div>
+                  <div class="key-row"><span class="key space"></span></div>
+                </div>
+              </div>
+              <p class="device-caption" id="simLaptopCaption">Interception kernel filter is dropping all scancodes in memory before Windows sees them.</p>
+            </div>
+          </div>
+
+          <!-- Wireless Keyboard Device Card -->
+          <div class="device-box" id="simWirelessBox">
+            <div class="device-header">
+              <div class="device-identity">
+                <span class="device-type">USB Peripheral</span>
+                <span class="device-name">Wireless Keyboard & Mouse</span>
+              </div>
+              <span class="status-pill status-active" id="simWirelessPill">CONNECTED</span>
+            </div>
+
+            <div class="device-body">
+              <div class="device-visual">
+                <div class="keyboard-frame active-frame" id="simWirelessFrame">
+                  <div class="key-row"><span class="key active"></span><span class="key active"></span><span class="key active"></span><span class="key active"></span><span class="key active"></span></div>
+                  <div class="key-row"><span class="key active"></span><span class="key active"></span><span class="key active"></span><span class="key active"></span><span class="key active"></span></div>
+                  <div class="key-row"><span class="key space active"></span></div>
+                </div>
+              </div>
+              <p class="device-caption" id="simWirelessCaption">Keystrokes from VID_1EA7&PID_0066 pass through unmodified at full speed.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulated Event Console -->
+        <div class="console-box">
+          <div class="console-bar">
+            <span>Live Kernel / Event Log</span>
+            <span class="console-tag">real-time</span>
+          </div>
+          <pre id="simConsoleOutput" class="console-content"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Problem & Architecture -->
+  <section id="architecture" class="architecture-section">
+    <div class="section-container">
+      <div class="section-header">
+        <h2 class="section-title">Why other solutions fail on laptop keyboards</h2>
+        <p class="section-subtitle">Windows flags internal PS/2 keyboards as critical system devices, breaking Device Manager and ordinary scripts.</p>
+      </div>
+
+      <div class="comparison-grid">
+        <div class="comparison-card comp-failed">
+          <div class="card-title-group">
+            <span class="card-marker">×</span>
+            <h3>Standard PnP & pnputil</h3>
+          </div>
+          <p class="card-desc">
+            Windows assigns the flag <code>CM_DEVCAP_NONDISABLEABLE</code> to internal laptop keyboards. Running <code>pnputil /disable-device</code> fails with:
+          </p>
+          <div class="code-snippet-box">
+            <code>Failed to disable device:<br>Cannot disable critical system device.</code>
+          </div>
+          <p class="card-note">In Device Manager, the "Disable device" option is completely greyed out.</p>
+        </div>
+
+        <div class="comparison-card comp-success">
+          <div class="card-title-group">
+            <span class="card-marker check">✓</span>
+            <h3>Dual-Engine Architecture</h3>
+          </div>
+          <p class="card-desc">
+            LaptopKeyboardAutoToggle bypasses the Device Manager block by filtering scancodes at the kernel driver layer:
+          </p>
+          <ul class="engine-list">
+            <li>
+              <strong>Windows Engine:</strong> Uses an Interception class filter driver to discard internal keyboard scancodes with 0ms latency while letting your wireless dongle type freely.
+            </li>
+            <li>
+              <strong>Ubuntu / Linux Engine:</strong> Leverages the native Linux kernel serio bus unbinding (<code>/sys/bus/serio/drivers/atkbd/unbind</code>) without needing third-party drivers.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Installation & Usage Guide -->
+  <section id="install" class="install-section">
+    <div class="section-container">
+      <div class="section-header">
+        <h2 class="section-title">Get started in two clicks</h2>
+        <p class="section-subtitle">Choose your operating system to see the setup process.</p>
+      </div>
+
+      <!-- OS Tabs -->
+      <div class="os-tabs">
+        <button class="os-tab active" data-tab="win">Windows 10 / 11</button>
+        <button class="os-tab" data-tab="linux">Ubuntu / Debian</button>
+      </div>
+
+      <!-- Windows Tab Content -->
+      <div class="tab-pane active" id="pane-win">
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Extract the zip</h3>
+            <p>Download <code>LaptopKeyboardAutoToggle-win-x64.zip</code> from GitHub and unzip the folder anywhere on your PC.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>Double-click ONE-CLICK-SETUP.bat</h3>
+            <p>Click "Yes" on the Windows Administrator prompt. It automatically registers the driver, schedules the elevated logon task, and launches the app.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>Reboot once</h3>
+            <p>Restart your laptop once so Windows kernel loads the keyboard filter. From then on, automation is 100% hands-free!</p>
+          </div>
+        </div>
+
+        <div class="emergency-callout">
+          <div class="callout-content">
+            <h3>Built-in Emergency Recovery</h3>
+            <p>If your wireless keyboard battery dies while the dongle stays plugged in, you are never locked out: right-click the system tray icon with your touchpad and click <strong>"Turn Internal Keyboard ON"</strong>, or press <code>Ctrl + Alt + Shift + F12</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Linux Tab Content -->
+      <div class="tab-pane" id="pane-linux">
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Download the .deb</h3>
+            <p>Download <code>laptop-keyboard-auto-toggle_1.0-1_all.deb</code> from GitHub Releases.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>Double-click to install</h3>
+            <p>Open it with Ubuntu Software Center and click <strong>Install</strong>, or run in terminal:</p>
+            <div class="code-line">
+              <code>sudo dpkg -i laptop-keyboard-auto-toggle_1.0-1_all.deb</code>
+              <button class="copy-btn" data-copy="sudo dpkg -i laptop-keyboard-auto-toggle_1.0-1_all.deb">Copy</button>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>Done</h3>
+            <p>The indicator appears in your Ubuntu top bar and automatically silences the internal keyboard on dongle connection.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <p><strong>LaptopKeyboardAutoToggle</strong></p>
+        <p class="footer-sub">Open-source software licensed under the MIT License.</p>
+      </div>
+
+      <div class="footer-right">
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle" target="_blank" rel="noopener">GitHub Repository</a>
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle/releases" target="_blank" rel="noopener">Releases & Changelog</a>
+        <a href="https://github.com/tanim913/LaptopKeyboardAutoToggle/issues" target="_blank" rel="noopener">Report Issue</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
