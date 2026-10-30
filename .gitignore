@@ -6,6 +6,7 @@ x86/
 [Bb]in/
 [Oo]bj/
 publish/
+dist/
 
 ## Visual Studio / IDE files
 .vs/
@@ -16,6 +17,8 @@ publish/
 
 ## Temporary files & logs
 *.log
+*.zip
+*.deb
 InterceptionPkg/
 Interception.zip
 

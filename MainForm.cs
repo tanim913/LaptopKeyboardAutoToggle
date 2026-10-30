@@ -17,6 +17,8 @@ namespace LaptopKeyboardAutoToggle
         private CheckBox _chkAutoToggle = null!;
         private Button _btnOpenLogs = null!;
         private Button _btnReloadConfig = null!;
+        private Button _btnInstallAutoStart = null!;
+        private Button _btnInstallDriver = null!;
         private Label _lblEmergencyHotkey = null!;
         private GroupBox _grpStatus = null!;
         private GroupBox _grpControls = null!;
@@ -45,7 +47,7 @@ namespace LaptopKeyboardAutoToggle
         private void InitializeComponent()
         {
             Text = "Laptop Keyboard Auto-Toggle & Manual Switch";
-            Size = new Size(540, 420);
+            Size = new Size(540, 470);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -106,7 +108,7 @@ namespace LaptopKeyboardAutoToggle
             {
                 Text = " Manual Control & Settings ",
                 Location = new Point(20, 205),
-                Size = new Size(485, 155),
+                Size = new Size(485, 205),
                 Font = new Font("Segoe UI", 9.5f, FontStyle.Bold)
             };
 
@@ -160,10 +162,32 @@ namespace LaptopKeyboardAutoToggle
                 _deviceService.InitializeState();
             };
 
+            _btnInstallAutoStart = new Button
+            {
+                Location = new Point(20, 125),
+                Size = new Size(240, 35),
+                Font = new Font("Segoe UI", 9f),
+                Text = "⚡ Enable Auto-Start on Boot",
+                FlatStyle = FlatStyle.System
+            };
+            _btnInstallAutoStart.Click += OnInstallAutoStartClicked;
+
+            _btnInstallDriver = new Button
+            {
+                Location = new Point(275, 125),
+                Size = new Size(190, 35),
+                Font = new Font("Segoe UI", 9f),
+                Text = "🛠️ Install / Fix Driver",
+                FlatStyle = FlatStyle.System
+            };
+            _btnInstallDriver.Click += OnInstallDriverClicked;
+
             _grpControls.Controls.Add(_btnManualToggle);
             _grpControls.Controls.Add(_chkAutoToggle);
             _grpControls.Controls.Add(_btnOpenLogs);
             _grpControls.Controls.Add(_btnReloadConfig);
+            _grpControls.Controls.Add(_btnInstallAutoStart);
+            _grpControls.Controls.Add(_btnInstallDriver);
 
             Controls.Add(_grpStatus);
             Controls.Add(_grpControls);
@@ -176,6 +200,60 @@ namespace LaptopKeyboardAutoToggle
                     Hide(); // Minimize to system tray
                 }
             };
+        }
+
+        private void OnInstallAutoStartClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                string scriptPath = Path.Combine(AppContext.BaseDirectory, "Install-Task.ps1");
+                if (!File.Exists(scriptPath))
+                {
+                    scriptPath = Path.Combine(AppContext.BaseDirectory, "..", "Install-Task.ps1");
+                }
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+
+                System.Diagnostics.Process.Start(psi);
+                MessageBox.Show(this, "Auto-start task installation requested!\nIt will now start with Windows with highest privileges (no UAC prompts).", "Auto-Start Setup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Failed to launch task installer: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OnInstallDriverClicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                string scriptPath = Path.Combine(AppContext.BaseDirectory, "Setup-Interception.ps1");
+                if (!File.Exists(scriptPath))
+                {
+                    scriptPath = Path.Combine(AppContext.BaseDirectory, "..", "Setup-Interception.ps1");
+                }
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+
+                System.Diagnostics.Process.Start(psi);
+                MessageBox.Show(this, "Driver installer launched!\n\nIMPORTANT: Once installation finishes, restart your laptop once to activate the driver.", "Driver Setup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Failed to launch driver installer: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void OnManualToggleClicked(object? sender, EventArgs e)
