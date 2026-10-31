@@ -7,6 +7,7 @@ A lightweight utility that automatically disables a laptop's internal keyboard w
 The Windows app is unchanged. The Linux package was fixed so it works out of the box:
 
 * **Choose Wireless Dongle** menu in the top-bar icon: pick your receiver from the connected USB devices instead of editing vendor/product IDs by hand. Previously the app only knew one hard-coded dongle and silently did nothing with any other.
+* The internal keyboard now **stays** disabled: the serio port is switched to manual bind mode, because otherwise the kernel re-attaches the keyboard on the next keystroke (including ghost keystrokes from a faulty keyboard).
 * The internal keyboard is now always restored when the app is stopped or you log out, even during the first few seconds while the kernel is still unbinding it.
 * Only one instance runs at a time (autostart + app-menu launch no longer fight).
 * Resuming from **Pause** re-applies the dongle state immediately.

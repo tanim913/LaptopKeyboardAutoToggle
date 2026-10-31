@@ -108,7 +108,7 @@ jobs:
       run: |
         test -x /usr/bin/laptop-keyboard-auto-toggle
         test -x /usr/bin/laptop-keyboard-toggle-helper
-        test "$(stat -c %a /etc/sudoers.d/laptop-keyboard-toggle)" = 440
+        test "$(sudo stat -c %a /etc/sudoers.d/laptop-keyboard-toggle)" = 440
         sudo visudo -c
         laptop-keyboard-toggle-helper status
         # The helper runs as root for any user: it must reject anything but a serio device
@@ -119,7 +119,7 @@ jobs:
     - name: Remove package
       run: |
         sudo apt-get remove -y laptop-keyboard-auto-toggle
-        test ! -e /etc/sudoers.d/laptop-keyboard-toggle
+        sudo test ! -e /etc/sudoers.d/laptop-keyboard-toggle
 
   release:
     needs: [build-windows, build-linux, test-linux]

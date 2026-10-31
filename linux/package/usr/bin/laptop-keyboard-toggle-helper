@@ -12,12 +12,16 @@ fi
 case "$ACTION" in
     disable)
         if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then
+            # Without manual mode the kernel rebinds atkbd on the next byte the keyboard sends
+            echo -n manual > "/sys/bus/serio/devices/$SERIO_DEV/bind_mode"
             echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/unbind
             logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV unbind: DISABLED"
         fi
         ;;
     enable)
         if [ -d "/sys/bus/serio/devices/$SERIO_DEV" ]; then
+            # auto first: a manual-mode port refuses driver binds
+            echo -n auto > "/sys/bus/serio/devices/$SERIO_DEV/bind_mode"
             echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/bind 2>/dev/null || true
             logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV bind: ENABLED"
         fi
