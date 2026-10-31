@@ -5,4 +5,8 @@ chmod 0755 /usr/bin/laptop-keyboard-auto-toggle 2>/dev/null || true
 chmod 0755 /usr/bin/laptop-keyboard-toggle-helper 2>/dev/null || true
 chmod 0440 /etc/sudoers.d/laptop-keyboard-toggle 2>/dev/null || true
 
+# Load the udev rule and apply the dongle state now, without waiting for a replug or reboot
+udevadm control --reload-rules 2>/dev/null || true
+/usr/bin/laptop-keyboard-toggle-helper apply || true
+
 exit 0

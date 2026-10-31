@@ -109,7 +109,7 @@ def build_deb(pkg_root, output_deb):
 
         added_dirs = set(["./"])
 
-        for item in ["etc", "usr"]:
+        for item in ["etc", "lib", "usr"]:
             item_path = os.path.join(pkg_root, item)
             if os.path.exists(item_path):
                 for root, dirs, files in os.walk(item_path):

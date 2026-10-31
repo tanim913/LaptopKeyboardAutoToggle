@@ -1,43 +1,90 @@
 #!/bin/bash
-# Helper script to bind/unbind internal PS/2 AT keyboard on Linux serio bus
-ACTION="${1:-status}"
-SERIO_DEV="${2:-serio0}"
+# Root helper: binds/unbinds the internal PS/2 AT keyboard on the Linux serio bus.
+# Called by udev on every USB plug/unplug (from boot on, before any login) and by the
+# tray app through sudo. The dongle choice lives in /etc so it works before login.
+CONF=/etc/laptop-keyboard-auto-toggle.conf
+PAUSE_FLAG=/run/laptop-keyboard-auto-toggle.paused   # /run is cleared on reboot
+DONGLE=1ea7:0066
+SERIO_DEV=serio0
 
-# Runs as root via sudoers for any user, so only accept a serio device name
-if ! [[ "$SERIO_DEV" =~ ^serio[0-9]+$ ]]; then
-    echo "Invalid serio device: $SERIO_DEV" >&2
-    exit 1
+# Runs as root for any user (sudoers) and from udev, so every value is validated
+if [ -r "$CONF" ]; then
+    v=$(sed -n 's/^DONGLE=//p' "$CONF" | tail -n1)
+    [[ "$v" =~ ^[0-9a-f]{4}:[0-9a-f]{4}$ ]] && DONGLE="$v"
+    s=$(sed -n 's/^SERIO=//p' "$CONF" | tail -n1)
+    [[ "$s" =~ ^serio[0-9]+$ ]] && SERIO_DEV="$s"
 fi
+VID="${DONGLE%:*}"
+PID="${DONGLE#*:}"
+DEV="/sys/bus/serio/devices/$SERIO_DEV"
+BOUND="/sys/bus/serio/drivers/atkbd/$SERIO_DEV"
 
-case "$ACTION" in
-    disable)
-        if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then
-            # Without manual mode the kernel rebinds atkbd on the next byte the keyboard sends
-            echo -n manual > "/sys/bus/serio/devices/$SERIO_DEV/bind_mode"
-            echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/unbind
-            logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV unbind: DISABLED"
-        fi
+disable_kb() {
+    # Manual mode first, even if atkbd hasn't bound yet at boot: otherwise the kernel
+    # rebinds atkbd on the next byte the keyboard sends
+    echo -n manual > "$DEV/bind_mode" 2>/dev/null
+    if [ -e "$BOUND" ]; then
+        echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/unbind
+        logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV unbind: DISABLED" 2>/dev/null
+    fi
+    return 0
+}
+
+enable_kb() {
+    [ -d "$DEV" ] || return 0
+    # auto first: a manual-mode port refuses driver binds
+    echo -n auto > "$DEV/bind_mode"
+    if [ ! -e "$BOUND" ]; then
+        echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/bind 2>/dev/null
+        logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV bind: ENABLED" 2>/dev/null
+    fi
+    return 0
+}
+
+dongle_present() {
+    for d in /sys/bus/usb/devices/*; do
+        [ "$(cat "$d/idVendor" 2>/dev/null)" = "$VID" ] && [ "$(cat "$d/idProduct" 2>/dev/null)" = "$PID" ] && return 0
+    done
+    return 1
+}
+
+apply() {
+    [ -e "$PAUSE_FLAG" ] && return 0
+    if dongle_present; then disable_kb; else enable_kb; fi
+}
+
+case "${1:-status}" in
+    disable) disable_kb ;;
+    enable)  enable_kb ;;
+    apply)   apply ;;
+    event)
+        # udev: event add|remove <PRODUCT>, PRODUCT is the kernel's "vid/pid/bcd" in hex
+        # without leading zeros. Used instead of a sysfs scan: on remove the device may linger.
+        IFS=/ read -r pv pp _ <<< "${3:-}"
+        [[ "$pv" =~ ^[0-9a-f]{1,4}$ && "$pp" =~ ^[0-9a-f]{1,4}$ ]] || exit 0
+        [ $((16#$pv)) -eq $((16#$VID)) ] && [ $((16#$pp)) -eq $((16#$PID)) ] || exit 0
+        [ -e "$PAUSE_FLAG" ] && exit 0
+        case "$2" in
+            add)    disable_kb ;;
+            remove) enable_kb ;;
+        esac
         ;;
-    enable)
-        if [ -d "/sys/bus/serio/devices/$SERIO_DEV" ]; then
-            # auto first: a manual-mode port refuses driver binds
-            echo -n auto > "/sys/bus/serio/devices/$SERIO_DEV/bind_mode"
-            echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/bind 2>/dev/null || true
-            logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV bind: ENABLED"
-        fi
+    set-dongle)
+        [[ "${2:-}" =~ ^[0-9a-f]{4}:[0-9a-f]{4}$ ]] || { echo "Invalid dongle id: ${2:-} (expected vvvv:pppp)" >&2; exit 1; }
+        printf '# Written by laptop-keyboard-toggle-helper\nDONGLE=%s\nSERIO=%s\n' "$2" "$SERIO_DEV" > "$CONF"
+        DONGLE="$2"; VID="${DONGLE%:*}"; PID="${DONGLE#*:}"
+        apply
         ;;
+    pause)   touch "$PAUSE_FLAG" ;;
+    resume)  rm -f "$PAUSE_FLAG"; apply ;;
+    config)  echo "$DONGLE $SERIO_DEV" ;;
     status)
-        if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then
-            echo "enabled"
-        else
-            echo "disabled"
-        fi
+        if [ -e "$BOUND" ]; then echo "enabled"; else echo "disabled"; fi
         ;;
     *)
-        echo "Usage: $0 {enable|disable|status} [serio_device]"
+        echo "Usage: $0 {status|enable|disable|apply|event add|remove PRODUCT|set-dongle vvvv:pppp|pause|resume|config}" >&2
         exit 1
         ;;
 esac
 
 exit 0
-

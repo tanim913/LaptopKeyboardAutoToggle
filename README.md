@@ -12,7 +12,7 @@ It also provides an interactive **system tray indicator & manual control dashboa
 
 Pre-compiled packages are available on the [**GitHub Releases**](https://github.com/tanim913/LaptopKeyboardAutoToggle/releases) page:
 * 🪟 **Windows (x64 Single-File Bundle):** `LaptopKeyboardAutoToggle-win-x64.zip`
-* 🐧 **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.1-1_all.deb`
+* 🐧 **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.2.0-1_all.deb`
 
 ---
 
@@ -48,9 +48,9 @@ LaptopKeyboardAutoToggle was engineered from the ground up to operate at the har
 
 ### 2. Linux / Ubuntu Engine Stack
 * **Kernel Bus Manipulation:** Bypasses user-space workarounds by directly unbinding the internal AT keyboard from the Linux kernel `serio` bus (`/sys/bus/serio/drivers/atkbd/unbind` targeting `serio0`). This silences the internal keyboard at the kernel level across both **Wayland** and **X11** sessions with zero third-party drivers.
-* **Hardware Event Pipeline:** Uses `pyudev` to stream real-time kernel `udev` subsystem events for USB device attachment and detachment.
+* **Hardware Event Pipeline:** A `udev` rule runs the root helper on every USB attach/detach and on the boot-time device scan, so switching works before login and without the tray app. The tray app uses `pyudev` to list connected receivers.
 * **Desktop Integration:** Built with GTK 3 and `AppIndicator3` (`python3-gi`) for native top-bar tray status menus in GNOME, Unity, and XFCE desktop environments.
-* **Packaging & Security:** Shipped as a standard Debian package (`.deb`) with automated `postinst` permissions, XDG autostart (`/etc/xdg/autostart`), desktop launcher (`/usr/share/applications`), and a scoped `/etc/sudoers.d/laptop-keyboard-toggle` rule allowing the background helper to unbind the bus without requiring sudo password prompts.
+* **Packaging & Security:** Shipped as a standard Debian package (`.deb`) with automated `postinst` permissions, XDG autostart (`/etc/xdg/autostart`), desktop launcher (`/usr/share/applications`), a udev rule (`/lib/udev/rules.d`), and a scoped `/etc/sudoers.d/laptop-keyboard-toggle` rule letting the tray menu call the validated root helper without password prompts.
 
 ### 3. Web & Documentation Stack
 * **Landing Page:** Static HTML5, modern CSS3 with frosted-glass acrylic surfaces (`backdrop-filter: blur(14px)`), and vanilla JavaScript.
@@ -94,28 +94,35 @@ To solve this, this app uses a **Dual-Engine Architecture**:
 ### How It Works on Linux
 On Linux, there is no "critical system device" block. The kernel natively supports unbinding the internal AT keyboard from the `serio` bus (`/sys/bus/serio/drivers/atkbd/unbind`). This silences the hardware at the kernel level across both **Wayland** and **X11** with zero third-party drivers.
 
+The switching is done by a **udev rule**, so it is fully automatic and does not depend on being logged in:
+* Boot with the dongle plugged in → the laptop keyboard is off from the login screen on.
+* Boot without it → the laptop keyboard works.
+* Plug / unplug at any time → it follows within a few seconds (the kernel takes ~4 s to release the keyboard).
+
+The port is put in manual bind mode while disabled, otherwise the kernel would re-attach the keyboard on its next keystroke. A reboot always returns it to normal.
+
 ### Linux Installation Steps
-1. Download **`laptop-keyboard-auto-toggle_1.1-1_all.deb`**.
+1. Download **`laptop-keyboard-auto-toggle_1.2.0-1_all.deb`**.
 2. Install via Terminal (`apt` pulls in the Python/GTK dependencies):
    ```bash
-   sudo apt install ./laptop-keyboard-auto-toggle_1.1-1_all.deb
+   sudo apt install ./laptop-keyboard-auto-toggle_1.2.0-1_all.deb
    ```
-3. Start it once from the app menu (**Laptop Keyboard Auto-Toggle**), or log out and back in. It auto-starts on every login after that (`/etc/xdg/autostart/`).
-4. **Pick your dongle:** click the keyboard icon in the top bar → **Choose Wireless Dongle** → select your receiver. The choice is saved, and the internal keyboard turns off right away (unbinding can take a few seconds).
+   Auto-toggling is active immediately.
+3. **Pick your dongle** (default is `1ea7:0066`): click the keyboard icon in the top bar → **Choose Wireless Dongle** → select your receiver. Or from a terminal, with the ID from `lsusb`:
+   ```bash
+   sudo laptop-keyboard-toggle-helper set-dongle 1ea7:0066
+   ```
 
-> On Debian or non-Ubuntu GNOME, the top-bar icon needs the AppIndicator extension (`gnome-shell-extension-appindicator`). Ubuntu ships it by default.
+> On Debian or non-Ubuntu GNOME, the top-bar icon needs the AppIndicator extension (`gnome-shell-extension-appindicator`). Ubuntu ships it by default. The automation works without the icon.
 
 ### Linux Controls & Configuration
-* **Top Bar Tray Icon:** Shows live status (`Internal KB: OFF | Dongle: PLUGGED`), lets you choose the dongle, pause auto-toggling, and manually switch the keyboard ON/OFF.
-* **Uninstall:** `sudo apt remove laptop-keyboard-auto-toggle` stops the app and re-enables the internal keyboard.
-* **Configuration:** The dongle menu writes `~/.config/laptop-keyboard-auto-toggle/config.json`; you can also edit it by hand (IDs from `lsusb`):
-   ```json
-   {
-     "usb_vendor_id": "1ea7",
-     "usb_product_id": "0066",
-     "serio_device": "serio0"
-   }
+* **Top Bar Tray Icon** (auto-starts at login): shows live status (`Internal KB: OFF | Dongle: PLUGGED`), lets you choose the dongle, pause auto-toggling, and manually switch the keyboard ON/OFF. Quitting it does not stop the automation.
+* **Configuration:** `/etc/laptop-keyboard-auto-toggle.conf` (system-wide, so it applies at the login screen):
+   ```ini
+   DONGLE=1ea7:0066
+   SERIO=serio0
    ```
+* **Uninstall:** `sudo apt remove laptop-keyboard-auto-toggle` removes the rule and re-enables the internal keyboard.
 
 ---
 
@@ -143,7 +150,8 @@ LaptopKeyboardAutoToggle/
 │   ├── build_deb.py              # Builds the .deb without dpkg (e.g. from Windows)
 │   └── package/                  # .deb root (version lives in DEBIAN/control)
 │       ├── DEBIAN/control        # Debian package metadata
-│       ├── usr/bin/              # Python daemon & serio helper script
+│       ├── lib/udev/rules.d/     # udev rule: switches on USB plug/unplug and at boot
+│       ├── usr/bin/              # Tray app & root serio helper script
 │       └── etc/                  # Sudoers permissions & autostart entry
 ├── PRODUCT.md                    # Product specification schema
 └── LICENSE                       # MIT License

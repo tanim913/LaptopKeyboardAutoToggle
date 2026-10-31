@@ -1,27 +1,25 @@
-# LaptopKeyboardAutoToggle v1.1.0
+# LaptopKeyboardAutoToggle v1.2.0
 
 A lightweight utility that automatically disables a laptop's internal keyboard when a wireless keyboard USB dongle is connected, and restores it when unplugged. Features a live system tray indicator and a manual override dashboard.
 
-## 🆕 What's new in 1.1.0 (Ubuntu / Debian)
+## 🆕 What's new in 1.2.0 (Ubuntu / Debian)
 
-The Windows app is unchanged. The Linux package was fixed so it works out of the box:
+The Windows app is unchanged. The Linux package is now fully automatic:
 
-* **Choose Wireless Dongle** menu in the top-bar icon: pick your receiver from the connected USB devices instead of editing vendor/product IDs by hand. Previously the app only knew one hard-coded dongle and silently did nothing with any other.
-* The internal keyboard now **stays** disabled: the serio port is switched to manual bind mode, because otherwise the kernel re-attaches the keyboard on the next keystroke (including ghost keystrokes from a faulty keyboard).
-* The internal keyboard is now always restored when the app is stopped or you log out, even during the first few seconds while the kernel is still unbinding it.
-* Only one instance runs at a time (autostart + app-menu launch no longer fight).
-* Resuming from **Pause** re-applies the dongle state immediately.
-* The tray status reflects what the kernel actually did, not what was requested.
-* The root helper rejects anything other than a `serioN` device name.
-* Uninstalling stops the running app and re-enables the internal keyboard.
-* CI now installs and removes the `.deb` on Ubuntu 22.04 and 24.04 before every release.
+* **Works from boot, before login, with no app running.** A udev rule switches the internal keyboard: boot with the dongle plugged in and the laptop keyboard is off from the login screen on; boot without it and the laptop keyboard works; plug/unplug any time and it follows.
+* **Unplugging always restores the laptop keyboard.** (1.1.0 missed the unplug event and could leave you with no working keyboard; do not use 1.1.0.)
+* The internal keyboard **stays** disabled: the serio port is switched to manual bind mode, because otherwise the kernel re-attaches the keyboard on the next keystroke (including ghost keystrokes from a faulty keyboard).
+* **Choose Wireless Dongle** menu in the top-bar icon: pick your receiver from the connected USB devices. The choice is system-wide (`/etc/laptop-keyboard-auto-toggle.conf`) so it applies at the login screen too.
+* The tray icon is now just status and control (pause, manual ON/OFF). Quitting it does not stop the automation.
+* The root helper validates every argument; uninstalling re-enables the internal keyboard.
+* CI installs, exercises and removes the `.deb` on Ubuntu 22.04 and 24.04 before every release.
 
 ---
 
 ## 📦 Downloads
 
 * **Windows (x64 Single-File):** `LaptopKeyboardAutoToggle-win-x64.zip`
-* **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.1-1_all.deb`
+* **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.2.0-1_all.deb`
 
 ---
 
@@ -49,16 +47,19 @@ Standard Windows PnP blocks disabling internal PS/2 keyboards directly. Run this
 ## 🐧 Ubuntu / Debian Linux Instructions
 
 ### 1. Installation
-Download `laptop-keyboard-auto-toggle_1.1-1_all.deb` and install it in your terminal (upgrades 1.0 in place):
+Download `laptop-keyboard-auto-toggle_1.2.0-1_all.deb` and install it in your terminal (upgrades older versions in place):
 ```bash
-sudo apt install ./laptop-keyboard-auto-toggle_1.1-1_all.deb
+sudo apt install ./laptop-keyboard-auto-toggle_1.2.0-1_all.deb
 ```
-Then start **Laptop Keyboard Auto-Toggle** from the app menu once (or log out and back in).
+Auto-toggling is active immediately, no logout or reboot needed.
 
-### 2. Pick your dongle
-Click the keyboard icon in the top bar → **Choose Wireless Dongle** → select your receiver. The choice is saved to `~/.config/laptop-keyboard-auto-toggle/config.json`.
+### 2. Pick your dongle (only if it isn't `1ea7:0066`)
+Click the keyboard icon in the top bar → **Choose Wireless Dongle** → select your receiver. Or in a terminal, with the ID from `lsusb`:
+```bash
+sudo laptop-keyboard-toggle-helper set-dongle 1ea7:0066
+```
 
 ### 3. How It Works
-* The app automatically starts on desktop login (`/etc/xdg/autostart/`).
+* A udev rule (`/lib/udev/rules.d/90-laptop-keyboard-auto-toggle.rules`) runs on every USB plug/unplug and at boot, so it works before login.
 * Uses Linux kernel `serio0` bus unbinding to silence the internal keyboard natively with zero third-party drivers needed.
-* Shows an AppIndicator icon in your Ubuntu top bar for instant manual ON/OFF switching. On Debian GNOME, install `gnome-shell-extension-appindicator` for the icon.
+* The AppIndicator icon (auto-starts at login) shows status and offers pause and manual ON/OFF. On Debian GNOME, install `gnome-shell-extension-appindicator` for the icon.

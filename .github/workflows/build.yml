@@ -55,10 +55,12 @@ jobs:
       run: |
         chmod 0755 linux/package/DEBIAN/postinst
         chmod 0755 linux/package/DEBIAN/prerm
+        chmod 0755 linux/package/DEBIAN/postrm
         chmod 0644 linux/package/DEBIAN/control
         chmod 0755 linux/package/usr/bin/*
         chmod 0440 linux/package/etc/sudoers.d/*
         chmod 0644 linux/package/etc/xdg/autostart/*
+        chmod 0644 linux/package/lib/udev/rules.d/*
         chmod 0644 linux/package/usr/share/applications/*
 
     - name: Lint package sources
@@ -66,6 +68,7 @@ jobs:
         bash -n linux/package/usr/bin/laptop-keyboard-toggle-helper
         sh -n linux/package/DEBIAN/postinst
         sh -n linux/package/DEBIAN/prerm
+        sh -n linux/package/DEBIAN/postrm
         # ast.parse, not py_compile: a __pycache__ dir would end up inside the .deb
         python3 -c "import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])" linux/package/usr/bin/laptop-keyboard-auto-toggle
         visudo -cf linux/package/etc/sudoers.d/laptop-keyboard-toggle
@@ -111,9 +114,17 @@ jobs:
         test "$(sudo stat -c %a /etc/sudoers.d/laptop-keyboard-toggle)" = 440
         # Only our file: the runner image's own /etc/sudoers.d/runner fails a global check on 22.04
         sudo visudo -cf /etc/sudoers.d/laptop-keyboard-toggle
+        test -f /lib/udev/rules.d/90-laptop-keyboard-auto-toggle.rules
         laptop-keyboard-toggle-helper status
-        # The helper runs as root for any user: it must reject anything but a serio device
-        if sudo -n laptop-keyboard-toggle-helper disable ../../evil; then exit 1; fi
+        test "$(laptop-keyboard-toggle-helper config)" = "1ea7:0066 serio0"
+        # The helper runs as root for any user: it must reject a malformed dongle id
+        if sudo -n laptop-keyboard-toggle-helper set-dongle '../evil'; then exit 1; fi
+        sudo laptop-keyboard-toggle-helper set-dongle 3151:1020
+        test "$(laptop-keyboard-toggle-helper config)" = "3151:1020 serio0"
+        # udev's path: events for other devices and junk PRODUCT values are ignored
+        sudo laptop-keyboard-toggle-helper event add 46d/c52b/1200
+        sudo laptop-keyboard-toggle-helper event add 'junk;rm -rf /'
+        sudo laptop-keyboard-toggle-helper event remove 3151/1020/2
         # GTK, AppIndicator and pyudev must all load from the declared dependencies
         python3 -c "from importlib.machinery import SourceFileLoader; SourceFileLoader('app', '/usr/bin/laptop-keyboard-auto-toggle').load_module()"
 
@@ -121,6 +132,9 @@ jobs:
       run: |
         sudo apt-get remove -y laptop-keyboard-auto-toggle
         sudo test ! -e /etc/sudoers.d/laptop-keyboard-toggle
+        test ! -e /lib/udev/rules.d/90-laptop-keyboard-auto-toggle.rules
+        sudo apt-get purge -y laptop-keyboard-auto-toggle
+        test ! -e /etc/laptop-keyboard-auto-toggle.conf
 
   release:
     needs: [build-windows, build-linux, test-linux]

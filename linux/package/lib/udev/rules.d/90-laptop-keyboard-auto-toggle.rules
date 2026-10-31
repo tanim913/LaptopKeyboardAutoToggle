@@ -1,0 +1,5 @@
+# Laptop Keyboard Auto-Toggle: disable the internal keyboard while the wireless dongle is
+# plugged in, re-enable it when unplugged. Also runs at boot (udev replays "add" for every
+# device), so this works from the login screen on. The helper ignores every USB device
+# except the configured dongle (/etc/laptop-keyboard-auto-toggle.conf).
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ACTION=="add|remove", RUN+="/usr/bin/laptop-keyboard-toggle-helper event $env{ACTION} $env{PRODUCT}"

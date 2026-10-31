@@ -46,7 +46,7 @@ Unlike typical device managers that fail on internal laptop keyboards with "Cann
 ## Evidence on Hand
 
 - Live repository: `https://github.com/tanim913/LaptopKeyboardAutoToggle`
-- Releases available: `v1.1.0` with `LaptopKeyboardAutoToggle-win-x64.zip` and `laptop-keyboard-auto-toggle_1.1-1_all.deb`.
+- Releases available: `v1.2.0` with `LaptopKeyboardAutoToggle-win-x64.zip` and `laptop-keyboard-auto-toggle_1.2.0-1_all.deb`.
 - Verified hardware compatibility: HP PS/2 keyboards (`ACPI\HPQ8002`), generic wireless combos (`VID_1EA7&PID_0066`).
 
 ## Product Principles

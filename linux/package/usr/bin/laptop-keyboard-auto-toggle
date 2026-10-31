@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Laptop Keyboard Auto-Toggle (Linux / Ubuntu)
-Automatically disables internal PS/2 laptop keyboard when wireless USB dongle is connected,
-and restores it when unplugged. Also provides an AppIndicator tray icon for manual control.
+Laptop Keyboard Auto-Toggle (Linux / Ubuntu) - tray indicator.
+The automatic switching is done by a udev rule, from boot and before login: plugging the
+configured USB dongle disables the internal PS/2 keyboard, unplugging re-enables it.
+This AppIndicator tray icon shows the state and offers dongle choice, pause and manual control.
 """
 
 import sys
 import os
 import fcntl
-import json
 import signal
 import subprocess
-import threading
 import logging
 
 try:
@@ -37,46 +36,26 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
-CONFIG_DIR = os.path.expanduser("~/.config/laptop-keyboard-auto-toggle")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+LOCK_DIR = os.path.expanduser("~/.config/laptop-keyboard-auto-toggle")
 HELPER = "/usr/bin/laptop-keyboard-toggle-helper"
-DEFAULT_CONFIG = {
-    "usb_vendor_id": "1ea7",
-    "usb_product_id": "0066",
-    "serio_device": "serio0"
-}
+PAUSE_FLAG = "/run/laptop-keyboard-auto-toggle.paused"
+POLL_SECONDS = 2
 
-def load_config():
-    if not os.path.exists(CONFIG_DIR):
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                cfg = json.load(f)
-                return {**DEFAULT_CONFIG, **cfg}
-        except Exception as e:
-            logging.error(f"Error reading config: {e}")
-            return dict(DEFAULT_CONFIG)  # don't overwrite a config the user may want to fix
-    save_config(DEFAULT_CONFIG)
-    return dict(DEFAULT_CONFIG)
 
-def save_config(cfg):
+def run_helper(*args, root=False):
+    # -n: fail instead of hanging on a password prompt nobody can see
+    cmd = (["sudo", "-n"] if root else []) + [HELPER, *args]
     try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(cfg, f, indent=2)
+        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
     except Exception as e:
-        logging.error(f"Error writing config: {e}")
+        logging.error(f"Keyboard helper {' '.join(args)} failed: {e}")
+        return ""
+
 
 class KeyboardAutoToggleApp:
-    def __init__(self, config):
-        self.config = config
-        self.vendor_id = config.get("usb_vendor_id", "1ea7").lower()
-        self.product_id = config.get("usb_product_id", "0066").lower()
-        self.serio_dev = config.get("serio_device", "serio0")
-
-        self.is_paused = False
-        self.is_dongle_present = False
-        self.is_keyboard_disabled = False
+    def __init__(self):
+        self.load_config()
+        self.devices = None
 
         self.indicator = AppIndicator.Indicator.new(
             "laptop-keyboard-auto-toggle",
@@ -97,6 +76,7 @@ class KeyboardAutoToggleApp:
         self.menu.append(self.toggle_item)
 
         self.pause_item = Gtk.CheckMenuItem(label="Pause USB Auto-Toggle")
+        self.pause_item.set_active(os.path.exists(PAUSE_FLAG))  # before connect: no signal
         self.pause_item.connect("toggled", self.on_pause_toggled)
         self.menu.append(self.pause_item)
 
@@ -104,50 +84,31 @@ class KeyboardAutoToggleApp:
         self.menu.append(self.dongle_item)
 
         self.safety_item = Gtk.MenuItem(label="Enable internal keyboard now")
-        self.safety_item.connect("activate", lambda w: self.enable_internal_keyboard())
+        self.safety_item.connect("activate", lambda w: self.change_keyboard("enable"))
         self.menu.append(self.safety_item)
 
         self.menu.append(Gtk.SeparatorMenuItem())
 
-        self.quit_item = Gtk.MenuItem(label="Quit")
-        self.quit_item.connect("activate", self.on_quit)
+        self.quit_item = Gtk.MenuItem(label="Quit (auto-toggle keeps working)")
+        self.quit_item.connect("activate", lambda w: Gtk.main_quit())
         self.menu.append(self.quit_item)
 
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
 
-        # Initialize udev
         self.udev_ctx = pyudev.Context()
-        self.refresh_dongle_menu()
-        self.check_initial_dongle_presence()
+        self.refresh()
+        # udev switches the keyboard in the background (an unbind takes seconds), so poll
+        GLib.timeout_add_seconds(POLL_SECONDS, self.refresh)
 
-        # Start udev monitor thread
-        self.monitor_thread = threading.Thread(target=self.udev_listen_loop, daemon=True)
-        self.monitor_thread.start()
+    def load_config(self):
+        parts = run_helper("config").split()  # "vvvv:pppp serioN"
+        self.dongle = parts[0] if parts else ""
+        self.serio_dev = parts[1] if len(parts) > 1 else "serio0"
+        logging.info(f"Configured dongle: {self.dongle or 'unknown'}, keyboard port: {self.serio_dev}")
 
-    def check_initial_dongle_presence(self):
-        present = False
-        for device in self.udev_ctx.list_devices(subsystem='usb'):
-            v = device.properties.get('ID_VENDOR_ID', '').lower()
-            p = device.properties.get('ID_MODEL_ID', '').lower()
-            if v == self.vendor_id and p == self.product_id:
-                present = True
-                break
-
-        self.is_dongle_present = present
-        logging.info(f"Initial scan: Dongle {self.vendor_id}:{self.product_id} present = {present}")
-        self.apply_dongle_state()
-
-    def apply_dongle_state(self):
-        if self.is_paused:
-            self.update_ui()
-        elif self.is_dongle_present:
-            self.disable_internal_keyboard()
-        else:
-            self.enable_internal_keyboard()
-
-    def refresh_dongle_menu(self):
-        """Rebuild the 'Choose Wireless Dongle' submenu from the connected USB HID devices."""
+    def connected_hid_devices(self):
+        """{'vvvv:pppp': name} of connected USB devices with a HID (keyboard/mouse) interface."""
         devices = {}
         for intf in self.udev_ctx.list_devices(subsystem='usb', DEVTYPE='usb_interface'):
             if not intf.properties.get('INTERFACE', '').startswith('3/'):  # 3 = HID class
@@ -156,127 +117,78 @@ class KeyboardAutoToggleApp:
             if dev is None:
                 continue
             props = dev.properties
-            v = props.get('ID_VENDOR_ID', '').lower()
-            p = props.get('ID_MODEL_ID', '').lower()
+            dongle_id = f"{props.get('ID_VENDOR_ID', '')}:{props.get('ID_MODEL_ID', '')}".lower()
             vendor = props.get('ID_VENDOR_FROM_DATABASE') or props.get('ID_VENDOR', '')
             model = props.get('ID_MODEL_FROM_DATABASE') or props.get('ID_MODEL', '')
-            devices[(v, p)] = f"{vendor} {model}".replace('_', ' ').strip()
+            devices[dongle_id] = f"{vendor} {model}".replace('_', ' ').strip()
+        return devices
 
+    def refresh(self):
+        devices = self.connected_hid_devices()
+        if devices != self.devices:
+            self.devices = devices
+            self.rebuild_dongle_menu()
+
+        kb_on = os.path.exists(f"/sys/bus/serio/drivers/atkbd/{self.serio_dev}")
+        dongle_str = "PLUGGED" if self.dongle in devices else "UNPLUGGED"
+        paused_str = " | PAUSED" if os.path.exists(PAUSE_FLAG) else ""
+        self.status_item.set_label(f"Internal KB: {'ON' if kb_on else 'OFF'} | Dongle: {dongle_str}{paused_str}")
+        self.toggle_item.set_label("Turn Keyboard OFF" if kb_on else "Turn Keyboard ON")
+        self.kb_on = kb_on
+        return GLib.SOURCE_CONTINUE
+
+    def rebuild_dongle_menu(self):
         submenu = Gtk.Menu()
-        for (v, p), name in sorted(devices.items()):
-            item = Gtk.CheckMenuItem(label=f"{name} ({v}:{p})")
-            item.set_active((v, p) == (self.vendor_id, self.product_id))
-            item.connect("activate", self.on_dongle_chosen, v, p)  # after set_active, which also emits it
+        for dongle_id, name in sorted(self.devices.items()):
+            item = Gtk.CheckMenuItem(label=f"{name} ({dongle_id})")
+            item.set_active(dongle_id == self.dongle)
+            item.connect("activate", self.on_dongle_chosen, dongle_id)  # after set_active, which also emits it
             submenu.append(item)
-        if not devices:
+        if not self.devices:
             empty = Gtk.MenuItem(label="No USB keyboard/mouse receivers connected")
             empty.set_sensitive(False)
             submenu.append(empty)
         submenu.show_all()
         self.dongle_item.set_submenu(submenu)
 
-    def on_dongle_chosen(self, widget, v, p):
-        logging.info(f"Dongle chosen from menu: {v}:{p}")
-        self.vendor_id, self.product_id = v, p
-        self.config.update(usb_vendor_id=v, usb_product_id=p)
-        save_config(self.config)
-        self.is_dongle_present = True  # only connected devices are listed
-        self.apply_dongle_state()
-        GLib.idle_add(self.refresh_dongle_menu)  # don't replace the submenu inside its own signal
+    def on_dongle_chosen(self, widget, dongle_id):
+        logging.info(f"Dongle chosen from menu: {dongle_id}")
+        run_helper("set-dongle", dongle_id, root=True)
+        self.load_config()
+        self.devices = None  # rebuild the menu (outside this signal) with the new check mark
+        GLib.idle_add(self.refresh)
 
-    def udev_listen_loop(self):
-        monitor = pyudev.Monitor.from_netlink(self.udev_ctx)
-        monitor.filter_by(subsystem='usb')
-        for device in iter(monitor.poll, None):
-            action = device.action
-            v = device.properties.get('ID_VENDOR_ID', '').lower()
-            p = device.properties.get('ID_MODEL_ID', '').lower()
-
-            if action in ('add', 'remove'):
-                GLib.idle_add(self.refresh_dongle_menu)
-
-            if v == self.vendor_id and p == self.product_id:
-                if action == 'add':
-                    logging.info(f"USB Dongle ARRIVAL: {v}:{p}")
-                    GLib.idle_add(self.on_dongle_arrived)
-                elif action == 'remove':
-                    logging.info(f"USB Dongle REMOVAL: {v}:{p}")
-                    GLib.idle_add(self.on_dongle_removed)
-
-    def on_dongle_arrived(self):
-        self.is_dongle_present = True
-        self.apply_dongle_state()
-
-    def on_dongle_removed(self):
-        self.is_dongle_present = False
-        self.apply_dongle_state()
-
-    def disable_internal_keyboard(self):
-        logging.info(f"Disabling internal keyboard ({self.serio_dev})...")
-        self.run_helper("disable")
-
-    def enable_internal_keyboard(self):
-        logging.info(f"Enabling internal keyboard ({self.serio_dev})...")
-        self.run_helper("enable")
-
-    def run_helper(self, action):
-        try:
-            # -n: fail instead of hanging on a password prompt nobody can see
-            subprocess.run(["sudo", "-n", HELPER, action, self.serio_dev], check=True)
-        except Exception as e:
-            logging.error(f"Error running keyboard helper ({action}): {e}")
-        # Report what the kernel actually did, not what we asked for
-        status = subprocess.run([HELPER, "status", self.serio_dev], capture_output=True, text=True).stdout.strip()
-        self.is_keyboard_disabled = status == "disabled"
-        self.update_ui()
+    def change_keyboard(self, action):
+        logging.info(f"Manual: {action} internal keyboard ({self.serio_dev})")
+        run_helper(action, root=True)
+        self.refresh()
 
     def on_manual_toggle(self, widget):
-        if self.is_keyboard_disabled:
-            self.enable_internal_keyboard()
-        else:
-            self.disable_internal_keyboard()
+        self.change_keyboard("disable" if self.kb_on else "enable")
 
     def on_pause_toggled(self, widget):
-        self.is_paused = widget.get_active()
-        logging.info(f"USB Auto-Toggle paused = {self.is_paused}")
-        self.apply_dongle_state()
+        paused = widget.get_active()
+        logging.info(f"USB Auto-Toggle paused = {paused}")
+        run_helper("pause" if paused else "resume", root=True)
+        self.refresh()
 
-    def update_ui(self):
-        kb_str = "OFF" if self.is_keyboard_disabled else "ON"
-        dongle_str = "PLUGGED" if self.is_dongle_present else "UNPLUGGED"
-        self.status_item.set_label(f"Internal KB: {kb_str} | Dongle: {dongle_str}")
-        self.toggle_item.set_label("Turn Keyboard ON" if self.is_keyboard_disabled else "Turn Keyboard OFF")
-
-    def on_quit(self, widget=None):
-        logging.info("Exiting. Ensuring internal keyboard is restored...")
-        self.enable_internal_keyboard()
-        Gtk.main_quit()
 
 def main():
-    cfg = load_config()
-
-    # Single instance: autostart and the app-menu launcher must not both drive the keyboard
-    lock_file = open(os.path.join(CONFIG_DIR, ".lock"), "w")
+    # Single instance: autostart and the app-menu launcher must not both add an icon
+    os.makedirs(LOCK_DIR, exist_ok=True)
+    lock_file = open(os.path.join(LOCK_DIR, ".lock"), "w")
     try:
         fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         logging.info("Already running; exiting.")
         sys.exit(0)
 
-    # GLib delivers these inside the main loop. Registered before the app starts because the
-    # first unbind can take seconds, and a signal then must not kill us without restoring the keyboard.
-    app = None
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, Gtk.main_quit)
 
-    def handle_signal():
-        app.on_quit()
-        return GLib.SOURCE_REMOVE
-
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, handle_signal)
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, handle_signal)
-
-    app = KeyboardAutoToggleApp(cfg)
+    KeyboardAutoToggleApp()
     Gtk.main()
+
 
 if __name__ == "__main__":
     main()
-
