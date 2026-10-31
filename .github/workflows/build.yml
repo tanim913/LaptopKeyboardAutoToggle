@@ -109,7 +109,8 @@ jobs:
         test -x /usr/bin/laptop-keyboard-auto-toggle
         test -x /usr/bin/laptop-keyboard-toggle-helper
         test "$(sudo stat -c %a /etc/sudoers.d/laptop-keyboard-toggle)" = 440
-        sudo visudo -c
+        # Only our file: the runner image's own /etc/sudoers.d/runner fails a global check on 22.04
+        sudo visudo -cf /etc/sudoers.d/laptop-keyboard-toggle
         laptop-keyboard-toggle-helper status
         # The helper runs as root for any user: it must reject anything but a serio device
         if sudo -n laptop-keyboard-toggle-helper disable ../../evil; then exit 1; fi
