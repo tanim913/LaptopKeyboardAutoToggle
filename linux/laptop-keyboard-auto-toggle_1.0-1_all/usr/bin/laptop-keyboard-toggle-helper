@@ -1,0 +1,33 @@
+#!/bin/bash
+# Helper script to bind/unbind internal PS/2 AT keyboard on Linux serio bus
+ACTION="${1:-status}"
+SERIO_DEV="${2:-serio0}"
+
+case "$ACTION" in
+    disable)
+        if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then
+            echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/unbind
+            logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV unbind: DISABLED"
+        fi
+        ;;
+    enable)
+        if [ -d "/sys/bus/serio/devices/$SERIO_DEV" ]; then
+            echo -n "$SERIO_DEV" > /sys/bus/serio/drivers/atkbd/bind 2>/dev/null || true
+            logger -t laptop-keyboard-toggle "Internal keyboard $SERIO_DEV bind: ENABLED"
+        fi
+        ;;
+    status)
+        if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then
+            echo "enabled"
+        else
+            echo "disabled"
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {enable|disable|status} [serio_device]"
+        exit 1
+        ;;
+esac
+
+exit 0
+

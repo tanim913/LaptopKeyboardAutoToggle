@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""
+Laptop Keyboard Auto-Toggle (Linux / Ubuntu)
+Automatically disables internal PS/2 laptop keyboard when wireless USB dongle is connected,
+and restores it when unplugged. Also provides an AppIndicator tray icon for manual control.
+"""
+
+import sys
+import os
+import json
+import signal
+import subprocess
+import threading
+import logging
+
+try:
+    import gi
+    gi.require_version('Gtk', '3.0')
+    try:
+        gi.require_version('AyatanaAppIndicator3', '0.1')
+        from gi.repository import AyatanaAppIndicator3 as AppIndicator
+    except (ValueError, ImportError):
+        gi.require_version('AppIndicator3', '0.1')
+        from gi.repository import AppIndicator3 as AppIndicator
+    from gi.repository import Gtk, GLib
+except Exception as e:
+    print(f"Error loading GTK / AppIndicator libraries: {e}", file=sys.stderr)
+    print("Please run: sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    import pyudev
+except ImportError:
+    print("Error loading pyudev. Please run: sudo apt install python3-pyudev", file=sys.stderr)
+    sys.exit(1)
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
+
+CONFIG_DIR = os.path.expanduser("~/.config/laptop-keyboard-auto-toggle")
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+DEFAULT_CONFIG = {
+    "usb_vendor_id": "1ea7",
+    "usb_product_id": "0066",
+    "serio_device": "serio0"
+}
+
+def load_config():
+    if not os.path.exists(CONFIG_DIR):
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                cfg = json.load(f)
+                return {**DEFAULT_CONFIG, **cfg}
+        except Exception as e:
+            logging.error(f"Error reading config: {e}")
+    # Write default config
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(DEFAULT_CONFIG, f, indent=2)
+    except Exception:
+        pass
+    return DEFAULT_CONFIG
+
+class KeyboardAutoToggleApp:
+    def __init__(self, config):
+        self.config = config
+        self.vendor_id = config.get("usb_vendor_id", "1ea7").lower()
+        self.product_id = config.get("usb_product_id", "0066").lower()
+        self.serio_dev = config.get("serio_device", "serio0")
+
+        self.is_paused = False
+        self.is_dongle_present = False
+        self.is_keyboard_disabled = False
+
+        self.indicator = AppIndicator.Indicator.new(
+            "laptop-keyboard-auto-toggle",
+            "input-keyboard",
+            AppIndicator.IndicatorCategory.HARDWARE
+        )
+        self.indicator.set_status(AppIndicator.IndicatorStatus.ACTIVE)
+
+        self.menu = Gtk.Menu()
+        self.status_item = Gtk.MenuItem(label="Status: Initializing...")
+        self.status_item.set_sensitive(False)
+        self.menu.append(self.status_item)
+
+        self.menu.append(Gtk.SeparatorMenuItem())
+
+        self.toggle_item = Gtk.MenuItem(label="Turn Keyboard OFF")
+        self.toggle_item.connect("activate", self.on_manual_toggle)
+        self.menu.append(self.toggle_item)
+
+        self.pause_item = Gtk.CheckMenuItem(label="Pause USB Auto-Toggle")
+        self.pause_item.connect("toggled", self.on_pause_toggled)
+        self.menu.append(self.pause_item)
+
+        self.safety_item = Gtk.MenuItem(label="Enable internal keyboard now")
+        self.safety_item.connect("activate", lambda w: self.enable_internal_keyboard())
+        self.menu.append(self.safety_item)
+
+        self.menu.append(Gtk.SeparatorMenuItem())
+
+        self.quit_item = Gtk.MenuItem(label="Quit")
+        self.quit_item.connect("activate", self.on_quit)
+        self.menu.append(self.quit_item)
+
+        self.menu.show_all()
+        self.indicator.set_menu(self.menu)
+
+        # Initialize udev
+        self.udev_ctx = pyudev.Context()
+        self.check_initial_dongle_presence()
+
+        # Start udev monitor thread
+        self.monitor_thread = threading.Thread(target=self.udev_listen_loop, daemon=True)
+        self.monitor_thread.start()
+
+    def check_initial_dongle_presence(self):
+        present = False
+        for device in self.udev_ctx.list_devices(subsystem='usb'):
+            v = device.get('ID_VENDOR_ID', '').lower()
+            p = device.get('ID_MODEL_ID', '').lower()
+            if v == self.vendor_id and p == self.product_id:
+                present = True
+                break
+
+        self.is_dongle_present = present
+        logging.info(f"Initial scan: Dongle {self.vendor_id}:{self.product_id} present = {present}")
+        if present and not self.is_paused:
+            self.disable_internal_keyboard()
+        else:
+            self.enable_internal_keyboard()
+        self.update_ui()
+
+    def udev_listen_loop(self):
+        monitor = pyudev.Monitor.from_netlink(self.udev_ctx)
+        monitor.filter_by(subsystem='usb')
+        for device in iter(monitor.poll, None):
+            action = device.action
+            v = device.get('ID_VENDOR_ID', '').lower()
+            p = device.get('ID_MODEL_ID', '').lower()
+
+            if v == self.vendor_id and p == self.product_id:
+                if action == 'add':
+                    logging.info(f"USB Dongle ARRIVAL: {v}:{p}")
+                    GLib.idle_add(self.on_dongle_arrived)
+                elif action == 'remove':
+                    logging.info(f"USB Dongle REMOVAL: {v}:{p}")
+                    GLib.idle_add(self.on_dongle_removed)
+
+    def on_dongle_arrived(self):
+        self.is_dongle_present = True
+        if not self.is_paused:
+            self.disable_internal_keyboard()
+        self.update_ui()
+
+    def on_dongle_removed(self):
+        self.is_dongle_present = False
+        if not self.is_paused:
+            self.enable_internal_keyboard()
+        self.update_ui()
+
+    def disable_internal_keyboard(self):
+        logging.info(f"Disabling internal keyboard ({self.serio_dev})...")
+        try:
+            subprocess.run(["sudo", "/usr/bin/laptop-keyboard-toggle-helper", "disable", self.serio_dev], check=False)
+            self.is_keyboard_disabled = True
+        except Exception as e:
+            logging.error(f"Error disabling keyboard: {e}")
+        self.update_ui()
+
+    def enable_internal_keyboard(self):
+        logging.info(f"Enabling internal keyboard ({self.serio_dev})...")
+        try:
+            subprocess.run(["sudo", "/usr/bin/laptop-keyboard-toggle-helper", "enable", self.serio_dev], check=False)
+            self.is_keyboard_disabled = False
+        except Exception as e:
+            logging.error(f"Error enabling keyboard: {e}")
+        self.update_ui()
+
+    def on_manual_toggle(self, widget):
+        if self.is_keyboard_disabled:
+            self.enable_internal_keyboard()
+        else:
+            self.disable_internal_keyboard()
+
+    def on_pause_toggled(self, widget):
+        self.is_paused = widget.get_active()
+        logging.info(f"USB Auto-Toggle paused = {self.is_paused}")
+        self.update_ui()
+
+    def update_ui(self):
+        kb_str = "OFF" if self.is_keyboard_disabled else "ON"
+        dongle_str = "PLUGGED" if self.is_dongle_present else "UNPLUGGED"
+        self.status_item.set_label(f"Internal KB: {kb_str} | Dongle: {dongle_str}")
+        self.toggle_item.set_label("Turn Keyboard ON" if self.is_keyboard_disabled else "Turn Keyboard OFF")
+
+    def on_quit(self, widget=None):
+        logging.info("Exiting. Ensuring internal keyboard is restored...")
+        self.enable_internal_keyboard()
+        Gtk.main_quit()
+
+def main():
+    cfg = load_config()
+    app = KeyboardAutoToggleApp(cfg)
+
+    def handle_signal(sig, frame):
+        app.on_quit()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    Gtk.main()
+
+if __name__ == "__main__":
+    main()
+

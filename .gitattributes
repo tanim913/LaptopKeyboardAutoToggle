@@ -1,0 +1,4 @@
+# Enforce LF endings on Linux package files, shell scripts, and control files
+linux/** text eol=lf
+*.sh text eol=lf
+*.py text eol=lf

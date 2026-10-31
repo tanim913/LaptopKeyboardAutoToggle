@@ -3,10 +3,14 @@
 [Rr]elease/
 x64/
 x86/
-[Bb]in/
-[Oo]bj/
+/[Bb]in/
+/[Oo]bj/
 publish/
 dist/
+
+# Ensure Linux package usr/bin is tracked
+!linux/**/bin/
+!linux/**/bin/*
 
 ## Visual Studio / IDE files
 .vs/
