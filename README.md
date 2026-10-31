@@ -12,7 +12,7 @@ It also provides an interactive **system tray indicator & manual control dashboa
 
 Pre-compiled packages are available on the [**GitHub Releases**](https://github.com/tanim913/LaptopKeyboardAutoToggle/releases) page:
 * 🪟 **Windows (x64 Single-File Bundle):** `LaptopKeyboardAutoToggle-win-x64.zip`
-* 🐧 **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.0-1_all.deb`
+* 🐧 **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.1-1_all.deb`
 
 ---
 
@@ -95,17 +95,20 @@ To solve this, this app uses a **Dual-Engine Architecture**:
 On Linux, there is no "critical system device" block. The kernel natively supports unbinding the internal AT keyboard from the `serio` bus (`/sys/bus/serio/drivers/atkbd/unbind`). This silences the hardware at the kernel level across both **Wayland** and **X11** with zero third-party drivers.
 
 ### Linux Installation Steps
-1. Download **`laptop-keyboard-auto-toggle_1.0-1_all.deb`**.
-2. Install via Terminal or double-click in Software Center:
+1. Download **`laptop-keyboard-auto-toggle_1.1-1_all.deb`**.
+2. Install via Terminal (`apt` pulls in the Python/GTK dependencies):
    ```bash
-   sudo dpkg -i laptop-keyboard-auto-toggle_1.0-1_all.deb
-   sudo apt-get install -f
+   sudo apt install ./laptop-keyboard-auto-toggle_1.1-1_all.deb
    ```
-3. The app adds an auto-start desktop entry (`/etc/xdg/autostart/`) and launches automatically on login.
+3. Start it once from the app menu (**Laptop Keyboard Auto-Toggle**), or log out and back in. It auto-starts on every login after that (`/etc/xdg/autostart/`).
+4. **Pick your dongle:** click the keyboard icon in the top bar → **Choose Wireless Dongle** → select your receiver. The choice is saved, and the internal keyboard turns off right away (unbinding can take a few seconds).
+
+> On Debian or non-Ubuntu GNOME, the top-bar icon needs the AppIndicator extension (`gnome-shell-extension-appindicator`). Ubuntu ships it by default.
 
 ### Linux Controls & Configuration
-* **Top Bar Tray Icon:** Shows live status (`Internal KB: OFF | Dongle: PLUGGED`) and lets you manually switch the keyboard ON/OFF.
-* **Configuration:** Edit `~/.config/laptop-keyboard-auto-toggle/config.json` to change the target USB vendor/product ID:
+* **Top Bar Tray Icon:** Shows live status (`Internal KB: OFF | Dongle: PLUGGED`), lets you choose the dongle, pause auto-toggling, and manually switch the keyboard ON/OFF.
+* **Uninstall:** `sudo apt remove laptop-keyboard-auto-toggle` stops the app and re-enables the internal keyboard.
+* **Configuration:** The dongle menu writes `~/.config/laptop-keyboard-auto-toggle/config.json`; you can also edit it by hand (IDs from `lsusb`):
    ```json
    {
      "usb_vendor_id": "1ea7",
@@ -137,8 +140,8 @@ LaptopKeyboardAutoToggle/
 ├── Uninstall-Task.ps1            # Windows uninstaller script
 ├── Setup-Interception.ps1        # Windows driver installer script
 ├── linux/                        # Linux packaging source
-│   ├── build_deb.py              # Script to build .deb package
-│   └── laptop-keyboard-auto-toggle_1.0-1_all/
+│   ├── build_deb.py              # Builds the .deb without dpkg (e.g. from Windows)
+│   └── package/                  # .deb root (version lives in DEBIAN/control)
 │       ├── DEBIAN/control        # Debian package metadata
 │       ├── usr/bin/              # Python daemon & serio helper script
 │       └── etc/                  # Sudoers permissions & autostart entry

@@ -172,6 +172,8 @@ def build_deb(pkg_root, output_deb):
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    pkg_dir = os.path.join(script_dir, "laptop-keyboard-auto-toggle_1.0-1_all")
-    out_file = os.path.join(script_dir, "..", "laptop-keyboard-auto-toggle_1.0-1_all.deb")
+    pkg_dir = os.path.join(script_dir, "package")
+    with open(os.path.join(pkg_dir, "DEBIAN", "control")) as f:
+        version = next(line.split(":", 1)[1].strip() for line in f if line.startswith("Version:"))
+    out_file = os.path.join(script_dir, "..", f"laptop-keyboard-auto-toggle_{version}_all.deb")
     build_deb(pkg_dir, out_file)

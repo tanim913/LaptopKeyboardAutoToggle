@@ -53,30 +53,76 @@ jobs:
 
     - name: Set Debian package file permissions
       run: |
-        chmod 0755 linux/laptop-keyboard-auto-toggle_1.0-1_all/DEBIAN/postinst
-        chmod 0755 linux/laptop-keyboard-auto-toggle_1.0-1_all/DEBIAN/prerm
-        chmod 0644 linux/laptop-keyboard-auto-toggle_1.0-1_all/DEBIAN/control
-        chmod 0755 linux/laptop-keyboard-auto-toggle_1.0-1_all/usr/bin/*
-        chmod 0440 linux/laptop-keyboard-auto-toggle_1.0-1_all/etc/sudoers.d/*
-        chmod 0644 linux/laptop-keyboard-auto-toggle_1.0-1_all/etc/xdg/autostart/*
-        chmod 0644 linux/laptop-keyboard-auto-toggle_1.0-1_all/usr/share/applications/*
+        chmod 0755 linux/package/DEBIAN/postinst
+        chmod 0755 linux/package/DEBIAN/prerm
+        chmod 0644 linux/package/DEBIAN/control
+        chmod 0755 linux/package/usr/bin/*
+        chmod 0440 linux/package/etc/sudoers.d/*
+        chmod 0644 linux/package/etc/xdg/autostart/*
+        chmod 0644 linux/package/usr/share/applications/*
+
+    - name: Lint package sources
+      run: |
+        bash -n linux/package/usr/bin/laptop-keyboard-toggle-helper
+        sh -n linux/package/DEBIAN/postinst
+        sh -n linux/package/DEBIAN/prerm
+        # ast.parse, not py_compile: a __pycache__ dir would end up inside the .deb
+        python3 -c "import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])" linux/package/usr/bin/laptop-keyboard-auto-toggle
+        visudo -cf linux/package/etc/sudoers.d/laptop-keyboard-toggle
 
     - name: Build Debian Package with native dpkg-deb
       run: |
-        dpkg-deb --build --root-owner-group linux/laptop-keyboard-auto-toggle_1.0-1_all ./laptop-keyboard-auto-toggle_1.0-1_all.deb
+        VERSION=$(sed -n 's/^Version: //p' linux/package/DEBIAN/control)
+        DEB="laptop-keyboard-auto-toggle_${VERSION}_all.deb"
+        dpkg-deb --build --root-owner-group linux/package "./$DEB"
         echo "=== Package Info ==="
-        dpkg-deb --info ./laptop-keyboard-auto-toggle_1.0-1_all.deb
+        dpkg-deb --info "./$DEB"
         echo "=== Package Contents ==="
-        dpkg-deb --contents ./laptop-keyboard-auto-toggle_1.0-1_all.deb
+        dpkg-deb --contents "./$DEB"
 
     - name: Upload Debian Artifact
       uses: actions/upload-artifact@v4
       with:
         name: laptop-keyboard-auto-toggle-deb
-        path: ./laptop-keyboard-auto-toggle_1.0-1_all.deb
+        path: ./laptop-keyboard-auto-toggle_*_all.deb
+
+  test-linux:
+    needs: build-linux
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Download Debian Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: laptop-keyboard-auto-toggle-deb
+        path: ./
+
+    - name: Install package (resolves real dependencies)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ./laptop-keyboard-auto-toggle_*_all.deb
+
+    - name: Smoke test installed files
+      run: |
+        test -x /usr/bin/laptop-keyboard-auto-toggle
+        test -x /usr/bin/laptop-keyboard-toggle-helper
+        test "$(stat -c %a /etc/sudoers.d/laptop-keyboard-toggle)" = 440
+        sudo visudo -c
+        laptop-keyboard-toggle-helper status
+        # The helper runs as root for any user: it must reject anything but a serio device
+        if sudo -n laptop-keyboard-toggle-helper disable ../../evil; then exit 1; fi
+        # GTK, AppIndicator and pyudev must all load from the declared dependencies
+        python3 -c "from importlib.machinery import SourceFileLoader; SourceFileLoader('app', '/usr/bin/laptop-keyboard-auto-toggle').load_module()"
+
+    - name: Remove package
+      run: |
+        sudo apt-get remove -y laptop-keyboard-auto-toggle
+        test ! -e /etc/sudoers.d/laptop-keyboard-toggle
 
   release:
-    needs: [build-windows, build-linux]
+    needs: [build-windows, build-linux, test-linux]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -100,7 +146,7 @@ jobs:
       with:
         files: |
           ./LaptopKeyboardAutoToggle-win-x64.zip
-          ./laptop-keyboard-auto-toggle_1.0-1_all.deb
+          ./laptop-keyboard-auto-toggle_*_all.deb
         body_path: ./release-notes.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

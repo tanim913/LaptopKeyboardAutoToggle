@@ -1,9 +1,10 @@
 Package: laptop-keyboard-auto-toggle
-Version: 1.0-1
+Version: 1.1-1
 Section: utils
 Priority: optional
 Architecture: all
 Depends: python3, python3-pyudev, python3-gi, gir1.2-ayatanaappindicator3-0.1 | gir1.2-appindicator3-0.1
+Recommends: gnome-shell-extension-appindicator
 Maintainer: tanim913 <42853370+tanim913@users.noreply.github.com>
 Homepage: https://github.com/tanim913/LaptopKeyboardAutoToggle
 Description: Automatically disables laptop internal keyboard when wireless USB dongle is connected.

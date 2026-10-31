@@ -3,6 +3,12 @@
 ACTION="${1:-status}"
 SERIO_DEV="${2:-serio0}"
 
+# Runs as root via sudoers for any user, so only accept a serio device name
+if ! [[ "$SERIO_DEV" =~ ^serio[0-9]+$ ]]; then
+    echo "Invalid serio device: $SERIO_DEV" >&2
+    exit 1
+fi
+
 case "$ACTION" in
     disable)
         if [ -e "/sys/bus/serio/drivers/atkbd/$SERIO_DEV" ]; then

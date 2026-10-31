@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "remove" ]; then
+    # Stop running tray apps so none keeps unbinding the keyboard after removal
+    pkill -f /usr/bin/laptop-keyboard-auto-toggle 2>/dev/null || true
+fi
+
+# Always re-enable internal keyboard before uninstalling
+/usr/bin/laptop-keyboard-toggle-helper enable serio0 2>/dev/null || true
+
+exit 0
