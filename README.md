@@ -14,6 +14,8 @@ Pre-compiled packages are available on the [**GitHub Releases**](https://github.
 * 🪟 **Windows (x64 Single-File Bundle):** `LaptopKeyboardAutoToggle-win-x64.zip`
 * 🐧 **Ubuntu / Debian (.deb Package):** `laptop-keyboard-auto-toggle_1.2.0-1_all.deb`
 
+What changed in each version, including the Ubuntu fixes in v1.2.0: [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## 🛠️ Technology Stack & Engineering Architecture
