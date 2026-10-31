@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LaptopKeyboardAutoToggle — Social Preview Card</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background-color: #090d16;
+      color: #f8fafc;
+      font-family: 'Sora', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 56px;
+      position: relative;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Architectural frame & subtle corner marks */
+    .card-border {
+      position: absolute;
+      inset: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      pointer-events: none;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 2;
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background-color: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #60a5fa;
+    }
+
+    .brand-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background-color: #101726;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #10b981;
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 48px;
+      align-items: center;
+      z-index: 2;
+      margin: auto 0;
+    }
+
+    /* Left Column */
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .headline {
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.16;
+      letter-spacing: -0.035em;
+      color: #ffffff;
+    }
+
+    .subheadline {
+      font-size: 1.125rem;
+      line-height: 1.55;
+      color: #94a3b8;
+      max-width: 52ch;
+    }
+
+    .features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9375rem;
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .feature-check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Right Column (Visual Hardware State Card) */
+    .hardware-card {
+      background-color: #101726;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    .device-unit {
+      background-color: #0c121e;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .device-unit.muted-unit {
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .device-unit.active-unit {
+      border-color: rgba(16, 185, 129, 0.35);
+    }
+
+    .unit-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .unit-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .status-pill {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    .status-muted {
+      background-color: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .status-active {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    /* Mini Keyboard Visual */
+    .mini-keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .mini-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mini-key {
+      height: 14px;
+      flex: 1;
+      border-radius: 3px;
+      background-color: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .mini-key.space {
+      flex: 3;
+    }
+
+    .mini-key.muted {
+      background-color: #1f1a14;
+      border-color: rgba(245, 158, 11, 0.3);
+      opacity: 0.6;
+    }
+
+    .mini-key.active {
+      background-color: #1a2c3f;
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .unit-caption {
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+
+    /* Console Snippet in Card */
+    .console-strip {
+      background-color: #070a10;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #c7d2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .console-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #10b981;
+    }
+
+    /* Footer / Credit Bar */
+    .footer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+      font-size: 0.875rem;
+      color: #94a3b8;
+      z-index: 2;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .author-name {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .repo-link {
+      font-family: 'JetBrains Mono', monospace;
+      color: #93c5fd;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card-border"></div>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="brand-mark">
+      <div class="brand-icon-box">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M6 12h.001M10 12h.001M14 12h.001M18 12h.001M7 16h10"></path>
+        </svg>
+      </div>
+      <span class="brand-name">LaptopKeyboardAutoToggle</span>
+    </div>
+
+    <div class="meta-badge">
+      <span class="badge-dot"></span>
+      <span>v1.0.0 • Windows 10/11 & Ubuntu</span>
+    </div>
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="main-grid">
+    <!-- Left Hero Copy -->
+    <div class="left-col">
+      <h1 class="headline">Silence your laptop keyboard when your wireless dongle connects.</h1>
+      <p class="subheadline">Bypasses Device Manager's critical system block with zero-latency kernel filtering and native serio bus unbinding.</p>
+
+      <div class="features-list">
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span>Automatic detection on USB plug & unplug</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span>Zero background polling • 1-click install</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-check">✓</span>
+          <span>Fail-safe recovery hotkey: Ctrl + Alt + Shift + F12</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Hardware State Representation -->
+    <div class="hardware-card">
+      <div class="device-unit muted-unit">
+        <div class="unit-header">
+          <span class="unit-title">Internal Laptop Keyboard</span>
+          <span class="status-pill status-muted">MUTED</span>
+        </div>
+        <div class="mini-keyboard">
+          <div class="mini-row"><span class="mini-key muted"></span><span class="mini-key muted"></span><span class="mini-key muted"></span><span class="mini-key muted"></span><span class="mini-key muted"></span></div>
+          <div class="mini-row"><span class="mini-key space muted"></span></div>
+        </div>
+        <span class="unit-caption">Kernel filter drops scancodes before OS sees them</span>
+      </div>
+
+      <div class="device-unit active-unit">
+        <div class="unit-header">
+          <span class="unit-title">Wireless Keyboard & Mouse</span>
+          <span class="status-pill status-active">CONNECTED</span>
+        </div>
+        <div class="mini-keyboard">
+          <div class="mini-row"><span class="mini-key active"></span><span class="mini-key active"></span><span class="mini-key active"></span><span class="mini-key active"></span><span class="mini-key active"></span></div>
+          <div class="mini-row"><span class="mini-key space active"></span></div>
+        </div>
+        <span class="unit-caption">Dongle typing passes through freely</span>
+      </div>
+
+      <div class="console-strip">
+        <span class="console-indicator"></span>
+        <span>[Kernel] Suppressed ACPI\HPQ8002 (0.2ms)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="footer-bar">
+    <div class="footer-left">
+      <span>Open Source (MIT)</span>
+      <span>•</span>
+      <span>Built by <strong class="author-name">Azizullah Tanim</strong></span>
+    </div>
+    <div class="repo-link">github.com/tanim913/LaptopKeyboardAutoToggle</div>
+  </div>
+</body>
+</html>
